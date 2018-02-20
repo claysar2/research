@@ -334,6 +334,9 @@ plt.savefig('OVI_aitoff_'+str(ds)+'.png')
 plt.clf()
 
 
+logH_I = np.reshape(logH_I, -1)
+logO_VI = np.reshape(logO_VI, -1)
+
 plt.subplot(111)
 logH_I = np.sort(logH_I)
 f = np.array([])
