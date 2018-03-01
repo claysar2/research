@@ -312,9 +312,7 @@ for i in range(start,end):
         plt.title('Metallicity')
         plt.grid()
 
-        v_los = ray_data['velocity_los'].in_units('km/s')
-        vel_los[i] += v_los        
-
+        v_los = ray_data['velocity_los'].in_units('km/s')        
 
         plt.subplot(326)
         plt.semilogy(path, v_los, color='black')
@@ -339,7 +337,7 @@ comm.Reduce(vel_los,reduce_vlos,op=MPI.SUM)
 if comm.rank == 0:
     # Save array data into text file
     filename = str(ds)+'_data.txt'
-    np.savetxt(filename,np.c_[x,y,H_I,O_VI, vel_los],fmt="%5.4f",header="theta, phi, H I, O VI")
+    np.savetxt(filename,np.c_[x,y,H_I,O_VI],fmt="%5.4f",header="theta, phi, H I, O VI")
 
 
 x = np.reshape(x,original_shape)
