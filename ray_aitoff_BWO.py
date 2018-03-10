@@ -9,6 +9,8 @@ import numpy.random as npr
 import matplotlib.pyplot as plt
 import time
 from mpi4py import MPI
+import os
+import shutil
 
 comm = MPI.COMM_WORLD
 
@@ -57,6 +59,13 @@ field_dicts = [dens_dict, temp_dict, metal_dict, HI_dict, OVI_dict]
 proj_scales = [40., 400.]
 
 proj_dims = ['x','y','z']
+
+if comm.rank == 0:
+    if os.path.exists('ray_files'):
+        shutil.rmtree('ray_files')
+        os.mkdir('ray_files')
+    else:
+        os.mkdir('ray_files')
 
 if comm.rank == 0 and MakeProjections == True:
 
