@@ -17,7 +17,7 @@ comm = MPI.COMM_WORLD
 t_start = time.time()
 
 # number of pixels per dimension (for Aitoff projection)
-pixels_per_dim = 32
+pixels_per_dim = 16
 
 remove_first_N_kpc = 1.0
 
@@ -40,10 +40,14 @@ ray_start = c - X
 R = 200.0
 
 # do you want projections of the spheres?  True/False
-MakeProjections = False
+MakeProjections = True
 
 # do you want debug information while the calculation goes on?  True/False
 Debug = True
+
+# do you want to write out ray files?  True/False
+WriteRays = True
+
 
 # fraction of rays that make plots?  (determined randomly)
 fraction_ray_plots = 0.0
@@ -60,7 +64,7 @@ proj_scales = [40., 400.]
 
 proj_dims = ['x','y','z']
 
-if comm.rank == 0:
+if comm.rank == 0 and WriteRays:
     if os.path.exists('ray_files'):
         shutil.rmtree('ray_files')
         os.mkdir('ray_files')
@@ -132,6 +136,8 @@ end_index = (comm.rank+1)*dN
 if Debug:
     print("I am on rank", comm.rank, "and my start and end indices are:", start_index, end_index, "of", x.size)
 
+raygen_start =  time.time()
+
 for i in range(start_index,end_index):
     theta = x[i]
     phi = y[i]
@@ -145,8 +151,12 @@ for i in range(start_index,end_index):
     ray_end = ray_start + dv
 
     padded_num = '{:05d}'.format(i)
-    rayfile = 'ray_files/ray'+str(ds)+'_'+padded_num+'.h5'
-    
+
+    if WriteRays:
+        rayfile = 'ray_files/ray'+str(ds)+'_'+padded_num+'.h5'
+    else:
+        rayfile = None
+ 
     ray = trident.make_simple_ray(ds,
                                   start_position=ray_start,
                                   end_position=ray_end,
@@ -261,6 +271,8 @@ for i in range(start_index,end_index):
        
         plt.clf()
 
+raygen_end =  time.time()
+
 reduce_HI = np.zeros_like(H_I)
 reduce_OVI = np.zeros_like(O_VI)
 reduce_vlos = np.zeros_like(vel_los)
@@ -280,6 +292,11 @@ y = np.reshape(y,original_shape)
 H_I = np.reshape(reduce_HI,original_shape)
 O_VI = np.reshape(reduce_OVI,original_shape)
 vel_los = np.reshape(reduce_vlos,original_shape)
+
+if Debug:
+
+    print("Ray generation took {:.3f} seconds on MPI task {:d}".format(raygen_end-raygen_start))
+    print("That's {:.3e} seconds per ray on this MPI task".format( (raygen_end-raygen_start)/(end_index-start_index)))
 
 
 if comm.rank == 0:
