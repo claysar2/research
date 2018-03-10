@@ -12,17 +12,20 @@ from mpi4py import MPI
 import os
 import shutil
 
+from yt.funcs import mylog
+mylog.setLevel(40)  # only logs errors and critical problems
+
 comm = MPI.COMM_WORLD
 
 t_start = time.time()
 
 # number of pixels per dimension (for Aitoff projection)
-pixels_per_dim = 16
+pixels_per_dim = 128
 
 remove_first_N_kpc = 1.0
 
 # Load dataset
-fn = '../DD0600/DD0600'
+fn = 'DD0600/DD0600'
 ds = yt.load(fn)
 
 # Add H I & O VI ion fields using Trident
@@ -40,7 +43,7 @@ ray_start = c - X
 R = 200.0
 
 # do you want projections of the spheres?  True/False
-MakeProjections = True
+MakeProjections = False
 
 # do you want debug information while the calculation goes on?  True/False
 Debug = True
@@ -150,7 +153,7 @@ for i in range(start_index,end_index):
     
     ray_end = ray_start + dv
 
-    padded_num = '{:05d}'.format(i)
+    padded_num = '{:06d}'.format(i)
 
     if WriteRays:
         rayfile = 'ray_files/ray'+str(ds)+'_'+padded_num+'.h5'
@@ -273,6 +276,19 @@ for i in range(start_index,end_index):
 
 raygen_end =  time.time()
 
+time_per_ray = np.array([(raygen_end-raygen_start)/(end_index-start_index)])
+
+tpr_min = np.array([-1.0])
+tpr_max = np.array([-1.0])
+tpr_mean = np.array([-1.0])
+#tpr_min = tmr_max = tpr_mean = -1.0
+
+# get some communication information
+comm.Reduce(time_per_ray,tpr_min,op=MPI.MIN)
+comm.Reduce(time_per_ray,tpr_max,op=MPI.MAX)
+comm.Reduce(time_per_ray,tpr_mean,op=MPI.SUM)
+tpr_mean /= comm.size
+
 reduce_HI = np.zeros_like(H_I)
 reduce_OVI = np.zeros_like(O_VI)
 reduce_vlos = np.zeros_like(vel_los)
@@ -281,10 +297,13 @@ comm.Reduce(H_I,reduce_HI,op=MPI.SUM)
 comm.Reduce(O_VI,reduce_OVI,op=MPI.SUM)
 comm.Reduce(vel_los,reduce_vlos,op=MPI.SUM)
 
+
+
+
 if comm.rank == 0:
     # Save array data into text file
     filename = str(ds)+'_data.txt'
-    np.savetxt(filename,np.c_[x,y,reduce_HI,reduce_OVI, reduce_vlos],fmt="%5.4e",header="theta, phi, HI, OVI, V_LOS")
+    np.savetxt(filename,np.c_[x, y, reduce_HI, reduce_OVI, reduce_vlos],fmt="%5.4e",header="theta, phi, HI, OVI, V_LOS")
 
 
 x = np.reshape(x,original_shape)
@@ -295,8 +314,8 @@ vel_los = np.reshape(reduce_vlos,original_shape)
 
 if Debug:
 
-    print("Ray generation took {:.3f} seconds on MPI task {:d}".format(raygen_end-raygen_start))
-    print("That's {:.3e} seconds per ray on this MPI task".format( (raygen_end-raygen_start)/(end_index-start_index)))
+    print("Ray generation took {:.3f} seconds on MPI task {:d}".format(raygen_end-raygen_start, comm.rank))
+    print("That's {:.3e} seconds per ray on this MPI task".format(time_per_ray[0]))
 
 
 if comm.rank == 0:
@@ -403,4 +422,7 @@ t_end = time.time()
 
 if comm.rank == 0:
     print("This calculation took {:.3f} seconds".format(t_end-t_start))
-    print("That's {:.3e} seconds per ray per MPI task".format( (t_end-t_start)*comm.size/reduce_HI.size))
+    print("That's {:.3e} seconds per ray per MPI task (including serial operations)".format( (t_end-t_start)*comm.size/reduce_HI.size))
+    print("For just ray generation, mean (min/max) time per MPI task is:  {:.3e} ({:.3e}/{:.3e})".format(tpr_mean[0],tpr_min[0],tpr_max[0]))
+
+
