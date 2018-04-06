@@ -20,12 +20,12 @@ comm = MPI.COMM_WORLD
 t_start = time.time()
 
 # number of pixels per dimension (for Aitoff projection)
-pixels_per_dim = 128
+pixels_per_dim = 512
 
 remove_first_N_kpc = 1.0
 
 # Load dataset
-fn = 'DD0600/DD0600'
+fn = "/mnt/scratch/dsilvia/simulations/reu_sims/MW_1638kpcBox_800pcCGM_200pcDisk_lowres/DD1500/DD1500"
 ds = yt.load(fn)
 
 # Add H I & O VI ion fields using Trident
@@ -43,7 +43,7 @@ ray_start = c - X
 R = 200.0
 
 # do you want projections of the spheres?  True/False
-MakeProjections = False
+MakeProjections = True
 
 # do you want debug information while the calculation goes on?  True/False
 Debug = True
@@ -159,13 +159,16 @@ for i in range(start_index,end_index):
         rayfile = 'ray_files/ray'+str(ds)+'_'+padded_num+'.h5'
     else:
         rayfile = None
- 
-    ray = trident.make_simple_ray(ds,
-                                  start_position=ray_start,
-                                  end_position=ray_end,
-                                  data_filename=rayfile,
-                                  fields=field_list,
-                                  ftype='gas')
+    
+    lr = trident.LightRay(ds)
+    ray = lr.make_light_ray(start_position=ray_start, end_position=ray_end, data_filename=rayfile, fields=field_list)
+
+#    ray = trident.make_simple_ray(ds,
+#                                  start_position=ray_start,
+#                                  end_position=ray_end,
+#                                  data_filename=rayfile,
+#                                  fields=field_list,
+#                                  ftype='gas')
     
     ray_data = ray.all_data()
 
@@ -375,8 +378,52 @@ if comm.rank == 0:
     plt.yticks(fontsize=7)
     plt.savefig('HI_LOS_aitoff_'+str(ds)+'.png',bbox_inches='tight',dpi=400)
 
-    plt.clf()
     
+    plt.clf()
+
+
+    plt.subplot(111)
+
+    plt.pcolor(x, y, logO_VI, cmap='viridis')
+    plt.title(str(ds)+" OVI Column Density",y=1.05,size=10)
+    plt.grid(True,alpha=0.5)
+    cbar = plt.colorbar(pad=0.02,shrink=0.55)
+    cbar.ax.tick_params(labelsize=6)
+    cbar.set_label(r'N$_{OVI}$ [cm$^{-2}$]',size=8)
+    plt.xticks(fontsize=7)
+    plt.yticks(fontsize=7)
+    plt.axis([x.min(), x.max(), y.min(), y.max()])
+    plt.savefig('OVI_cartesian_'+str(ds)+'.png',bbox_inches='tight',dpi=400)
+
+    plt.clf()
+
+    plt.subplot(111)
+
+    plt.pcolor(x, y, logH_I, cmap='plasma')
+    cbar=plt.colorbar(pad=0.02,shrink=0.55)
+    cbar.ax.tick_params(labelsize=6)
+    cbar.set_label(r'log N$_{HI}$ [cm$^{-2}$]',size=8)
+    plt.title(str(ds)+" HI Column Density",y=1.05,size=10)
+    plt.grid(True,alpha=0.5)
+    plt.xticks(fontsize=7)
+    plt.yticks(fontsize=7)
+    plt.axis([x.min(), x.max(), y.min(), y.max()])
+    plt.savefig('HI_cartesian_'+str(ds)+'.png',bbox_inches='tight',dpi=400)
+
+    plt.clf()
+
+    plt.pcolor(x, y, vel_los, cmap='plasma')
+    cbar=plt.colorbar(pad=0.02,shrink=0.55)
+    cbar.ax.tick_params(labelsize=6)
+    cbar.set_label(r'v$_{LOS}$ [km/s]',size=8)
+    plt.title(str(ds)+" HI line-of-sight velocity",y=1.05,size=10)
+    plt.grid(True,alpha=0.5)
+    plt.xticks(fontsize=7)
+    plt.yticks(fontsize=7)
+    plt.axis([x.min(), x.max(), y.min(), y.max()])
+    plt.savefig('HI_LOS_cartesian_'+str(ds)+'.png',bbox_inches='tight',dpi=400)
+
+    plt.clf()
 
     logH_I = np.reshape(logH_I, -1)
     logO_VI = np.reshape(logO_VI, -1)
@@ -416,6 +463,7 @@ if comm.rank == 0:
     plt.title('OVI cumulative covering fraction')
     plt.savefig(str(ds)+'_OVI_column_dens_fraction.png',bbox_inches='tight',dpi=400)
 
+
 comm.Barrier()
 
 t_end = time.time()
@@ -426,3 +474,5 @@ if comm.rank == 0:
     print("For just ray generation, mean (min/max) time per MPI task is:  {:.3e} ({:.3e}/{:.3e})".format(tpr_mean[0],tpr_min[0],tpr_max[0]))
 
 
+if comm.rank == 0:
+    print("JOB FINISHED")
